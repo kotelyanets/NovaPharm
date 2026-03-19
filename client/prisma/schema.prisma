@@ -12,12 +12,12 @@ datasource db {
 
 model Medicine {
   id                String           @id @default(cuid())
-  name              String           @unique
-  description       String?
-  strength          String?          // e.g., "500mg"
+  name              String
+  description       String?          @db.Text
+  strength          String?          // e.g., "500mg" or "Route: Oral"
   dosageForm        String?          // e.g., "Tablet", "Syrup"
-  indications       String?          
-  contraindications String?
+  indications       String?          @db.Text
+  contraindications String?          @db.Text
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -25,8 +25,17 @@ model Medicine {
   ingredients       ActiveIngredient[]
   manufacturerId    String?
   manufacturer      Manufacturer?    @relation(fields: [manufacturerId], references: [id])
+  categoryId        String?
+  category          Category?        @relation(fields: [categoryId], references: [id])
 
+  @@unique([name, strength, dosageForm])
   @@index([name])
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  medicines Medicine[]
 }
 
 model ActiveIngredient {
