@@ -11,14 +11,14 @@ type MedicineRecord = {
   pdfLink: string;
 };
 
-const BASE_URL = 'https://extranet.infarmed.pt/CITS-pesquisamedicamento-fo/pesquisaMedicamento.jsf';
-const SEARCH_LETTER = 'Paracetamol';
-const MIN_RESULTS = 20; // Lowered for instability
-const MAX_RESULTS = 100;
+const BASE_URL = 'https://www.infarmed.pt/web/infarmed/servicos-on-line/pesquisa-do-medicamento';
+const SEARCH_LETTER = 'A';
+const MIN_RESULTS = 100;
+const MAX_RESULTS = 200;
 const OUTPUT_FILE = path.join(__dirname, 'infomed_data.json');
 
 const randomDelay = async (page: Page): Promise<void> => {
-  const delay = Math.random() * 5000 + 2000;
+  const delay = Math.random() * 3000 + 2000;
   await page.waitForTimeout(delay);
 };
 
@@ -26,7 +26,7 @@ const compact = (value: string | null | undefined): string =>
   (value ?? '').replace(/\s+/g, ' ').trim();
 
 const findTextFromRow = async (row: ElementHandle<HTMLElement>): Promise<string[]> => {
-  const cells = await row.$$('td');
+  const cells = await row.$$('td, th');
   const values: string[] = [];
   for (const cell of cells) {
     values.push(compact(await cell.innerText()));
@@ -35,14 +35,50 @@ const findTextFromRow = async (row: ElementHandle<HTMLElement>): Promise<string[
 };
 
 const classifyRow = (texts: string[]): Omit<MedicineRecord, 'pdfLink'> => {
-  // PrimeFaces Table Columns usually:
-  // [0] DCI, [1] Nome, [2] Dosagem, [3] Forma, [4] Laboratório
-  return {
-    name: texts[1] ?? '',
-    strength: texts[2] ?? '',
-    dosageForm: texts[3] ?? '',
-    activeIngredient: texts[0] ?? '',
+  const fallback = {
+    name: texts[0] ?? '',
+    strength: texts[1] ?? '',
+    dosageForm: texts[2] ?? '',
+    activeIngredient: texts[3] ?? '',
     manufacturer: texts[4] ?? ''
+  };
+
+  const lower = texts.map((text) => text.toLowerCase());
+  const pick = (matcher: (text: string) => boolean): string =>
+    texts.find((t) => matcher(t.toLowerCase())) ?? '';
+
+  const strength =
+    pick((t) => /(mg|mcg|g|ml|iu|%)(\b|\/)/.test(t)) ||
+    fallback.strength;
+
+  const dosageForm =
+    pick((t) =>
+      /(comprimido|capsula|cápsula|xarope|solução|suspensão|pomada|gel|inje[cç][aã]o|spray|creme|granulado|gotas)/.test(
+        t
+      )
+    ) || fallback.dosageForm;
+
+  const manufacturer =
+    pick((t) =>
+      /(laborat[oó]rios|lda|s\.a\.|sa\b|pharma|farmac[êe]utica|generis|bial|tecnime[dé]ica|company)/.test(t)
+    ) || fallback.manufacturer;
+
+  const activeIngredient =
+    texts.find(
+      (t) =>
+        t !== fallback.name &&
+        t !== strength &&
+        t !== dosageForm &&
+        t !== manufacturer &&
+        t.length > 2
+    ) ?? fallback.activeIngredient;
+
+  return {
+    name: fallback.name,
+    strength,
+    dosageForm,
+    activeIngredient,
+    manufacturer
   };
 };
 
@@ -53,9 +89,17 @@ const findPdfLink = async (
   const anchors = await row.$$('a[href]');
   for (const anchor of anchors) {
     const href = await anchor.getAttribute('href');
-    if (!href) continue;
+    if (!href) {
+      continue;
+    }
+
     const absolute = new URL(href, pageUrl).toString();
-    if (absolute.toLowerCase().includes('.pdf') || absolute.includes('documental')) {
+    const label = compact((await anchor.innerText()).toLowerCase());
+    if (
+      absolute.toLowerCase().includes('.pdf') ||
+      /folheto|informativo|rcm/.test(label) ||
+      /folheto|informativo|rcm/.test(absolute.toLowerCase())
+    ) {
       return absolute;
     }
   }
@@ -63,121 +107,180 @@ const findPdfLink = async (
 };
 
 const tryCommonSearchPatterns = async (page: Page, letter: string): Promise<void> => {
-  try {
-    console.log('Waiting for search input...');
-    // Use ID-based locator to avoid escaping issues
-    const input = page.locator('id=form:nome_input');
-    await input.waitFor({ state: 'visible', timeout: 60000 });
-    
-    console.log('Filling search input...');
-    await input.fill(letter);
-    await randomDelay(page);
-    
-    console.log('Clicking search button...');
-    await page.locator('id=form:search-button').click();
-    
-    console.log('Waiting for results table...');
-    // Wait for either the table or an error message
-    await Promise.race([
-      page.waitForSelector('id=form:tabelaResultados_data', { timeout: 60000 }),
-      page.waitForSelector('.ui-messages-error', { timeout: 60000 })
-    ]);
-    await randomDelay(page);
-  } catch (e) {
-    console.error('Search interaction failed:', e);
-    throw e;
+  const candidateSearchSelectors = [
+    'input[type="search"]',
+    'input[name*="pesq" i]',
+    'input[name*="search" i]',
+    'input[id*="pesq" i]',
+    'input[id*="search" i]',
+    'input[type="text"]'
+  ];
+
+  for (const selector of candidateSearchSelectors) {
+    const input = page.locator(selector).first();
+    if ((await input.count()) === 0) {
+      continue;
+    }
+
+    try {
+      await input.fill('');
+      await randomDelay(page);
+      await input.fill(letter);
+
+      const submitButton = page
+        .locator(
+          'button:has-text("Pesquisar"), button:has-text("Search"), input[type="submit"], button[type="submit"]'
+        )
+        .first();
+
+      if ((await submitButton.count()) > 0) {
+        await randomDelay(page);
+        await submitButton.click();
+      } else {
+        await input.press('Enter');
+      }
+
+      await page.waitForLoadState('domcontentloaded');
+      await randomDelay(page);
+      return;
+    } catch {
+      continue;
+    }
   }
 };
 
 const getRows = async (page: Page): Promise<ElementHandle<HTMLElement>[]> => {
-  return (await page.$$('tbody#form\\:tabelaResultados_data tr.ui-widget-content')) as ElementHandle<HTMLElement>[];
+  const tableCandidates = [
+    'table tbody tr',
+    'table tr',
+    '[role="row"]',
+    '.results tr',
+    '.grid tr',
+    '.rgRow, .rgAltRow'
+  ];
+
+  for (const selector of tableCandidates) {
+    const rows = await page.$$(selector);
+    if (rows.length > 0) {
+      return rows as ElementHandle<HTMLElement>[];
+    }
+  }
+
+  return [];
 };
 
 const clickNextPage = async (page: Page): Promise<boolean> => {
-  const next = page.locator('.ui-paginator-next:not(.ui-state-disabled)').first();
-  if ((await next.count()) > 0) {
+  const nextCandidates = [
+    'a:has-text("Seguinte")',
+    'a:has-text("Próxima")',
+    'a:has-text("Next")',
+    'button:has-text("Seguinte")',
+    'button:has-text("Próxima")',
+    'button:has-text("Next")',
+    'a[aria-label*="next" i]',
+    'button[aria-label*="next" i]'
+  ];
+
+  for (const selector of nextCandidates) {
+    const next = page.locator(selector).first();
+    if ((await next.count()) === 0) {
+      continue;
+    }
+
+    const disabled = await next.getAttribute('disabled');
+    const className = (await next.getAttribute('class')) ?? '';
+    if (disabled !== null || /disabled/i.test(className)) {
+      continue;
+    }
+
+    await randomDelay(page);
     await next.click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await randomDelay(page);
     return true;
   }
+
   return false;
 };
 
 const scrapeInfomed = async (): Promise<MedicineRecord[]> => {
   const browser: Browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
+  const context = await browser.newContext({
+    locale: 'pt-PT',
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+  });
   const page = await context.newPage();
 
   const results: MedicineRecord[] = [];
   const dedupe = new Set<string>();
 
   try {
-    console.log(`Navigating to ${BASE_URL}...`);
-    // Use domcontentloaded for faster interaction on unstable site
-    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 90000 });
+    await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await randomDelay(page);
 
-    console.log(`Searching for "${SEARCH_LETTER}"...`);
     await tryCommonSearchPatterns(page, SEARCH_LETTER);
 
     let pageGuard = 0;
-    while (results.length < MAX_RESULTS && pageGuard < 30) {
+    while (results.length < MAX_RESULTS && pageGuard < 100) {
       pageGuard += 1;
-      
-      // Wait for table rows to be present
-      console.log('Waiting for table rows...');
-      try {
-        await page.waitForSelector('tbody#form\\:tabelaResultados_data tr', { timeout: 45000 });
-      } catch (e) {
-        console.warn('Timeout waiting for rows. Checking if any were found anyway...');
-      }
-
       const rows = await getRows(page);
-      console.log(`Found ${rows.length} rows on page ${pageGuard}. Total collected: ${results.length}`);
-
-      if (rows.length === 0) {
-        console.warn('No rows found. Breaking loop.');
-        break;
-      }
 
       for (const row of rows) {
         const texts = await findTextFromRow(row);
-        if (texts.length < 3) continue;
+        if (texts.length < 2) {
+          continue;
+        }
 
-        const record = classifyRow(texts);
-        const key = `${record.name}||${record.strength}||${record.manufacturer}`.toLowerCase();
+        const normalized = classifyRow(texts);
+        if (!normalized.name || /^nome|designação|medicamento$/i.test(normalized.name)) {
+          continue;
+        }
 
-        if (dedupe.has(key)) continue;
+        const key = [
+          normalized.name,
+          normalized.strength,
+          normalized.dosageForm,
+          normalized.activeIngredient,
+          normalized.manufacturer
+        ]
+          .map((value) => value.toLowerCase())
+          .join('||');
+
+        if (dedupe.has(key)) {
+          continue;
+        }
 
         const pdfLink = await findPdfLink(row, page.url());
         dedupe.add(key);
-        results.push({ ...record, pdfLink });
+        results.push({ ...normalized, pdfLink });
 
-        if (results.length >= MAX_RESULTS) break;
+        if (results.length >= MAX_RESULTS) {
+          break;
+        }
       }
 
-      if (results.length >= MAX_RESULTS) break;
+      if (results.length >= MAX_RESULTS) {
+        break;
+      }
 
-      console.log('Attempting to go to next page...');
       const moved = await clickNextPage(page);
       if (!moved) {
-        console.log('No more pages or next button disabled.');
         break;
       }
     }
-  } catch (error) {
-    console.error('Critical failure during scraping:', error);
-    // Don't throw, return what we have
   } finally {
     await browser.close();
   }
 
   if (results.length < MIN_RESULTS) {
-    console.warn(`Extracted only ${results.length} records. Site might be unstable.`);
+    throw new Error(
+      `Extracted ${results.length} medicines, which is below the expected minimum of ${MIN_RESULTS}. ` +
+        'Adjust selectors or pagination strategy for the current Infomed UI.'
+    );
   }
 
-  return results;
+  return results.slice(0, MAX_RESULTS);
 };
 
 const printImplementationPlan = (): void => {
