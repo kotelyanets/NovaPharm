@@ -64,9 +64,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 font-sans text-slate-900">
-      {/* Header / Hero Section */}
-      <header className="bg-white border-b border-slate-200 pt-16 pb-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent pointer-events-none" />
+      {/* Header / Hero Section - Fixed at top */}
+      <header className="sticky top-0 z-50 bg-white border-b border-slate-200 pt-8 pb-10 relative shadow-sm">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 via-white to-transparent pointer-events-none" />
         <div className="container mx-auto px-4 relative">
           <div className="max-w-3xl mx-auto text-center space-y-6">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-sm font-medium border border-blue-100">
@@ -103,7 +103,7 @@ export default function Home() {
       </header>
 
       {/* Results Section */}
-      <main className="container mx-auto px-4 -mt-12 pb-20">
+      <main className="container mx-auto px-4 mt-8 pb-20">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {isLoading ? (
             Array.from({ length: 6 }).map((_, i) => (
@@ -138,7 +138,7 @@ export default function Home() {
                   </div>
 
                   <div className="pt-2 flex flex-wrap gap-2">
-                    <Badge variant="primary">Ingredients: {medicine.ingredientIds?.length || 1}</Badge>
+                    <Badge variant="primary">Ingredients: {medicine.ingredients?.length || 0}</Badge>
                     <Badge variant="secondary">Ref: {medicine.id.slice(0, 8)}</Badge>
                   </div>
                   
