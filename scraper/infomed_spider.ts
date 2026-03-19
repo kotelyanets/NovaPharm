@@ -291,7 +291,7 @@ const printImplementationPlan = (): void => {
   console.log('4) Extract name, strength, dosage form, active ingredient, manufacturer, and PDF link.');
   console.log('5) Apply random anti-ban delays between interactions.');
   console.log(`6) Save output JSON to ${OUTPUT_FILE}.`);
-  console.log('7) Stop when 100-200 records are collected.');
+  console.log('7) Stop when 100–200 records are collected.');
   console.log('Awaiting your signal to run the scraper.');
 };
 
