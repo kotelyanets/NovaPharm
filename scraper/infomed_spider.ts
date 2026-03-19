@@ -11,7 +11,7 @@ type MedicineRecord = {
   pdfLink: string;
 };
 
-const BASE_URL = 'https://extranet.infarmed.pt/INFOMED/';
+const BASE_URL = 'https://www.infarmed.pt/web/infarmed/servicos-on-line/pesquisa-do-medicamento';
 const SEARCH_LETTER = 'A';
 const MIN_RESULTS = 100;
 const MAX_RESULTS = 200;
