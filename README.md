@@ -162,7 +162,6 @@ npm run build
 ### 4) Stop local infrastructure (when finished)
 
 ```bash
-cd /home/runner/work/NovaPharm/NovaPharm
 docker compose down
 ```
 
