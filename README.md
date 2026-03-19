@@ -1,71 +1,183 @@
 # NovaPharm
 
-NovaPharm is an enterprise-grade drug database and search platform designed for extreme performance, scalability, and medical-grade precision. Inspired by modern, scalable pharmaceutical platforms, NovaPharm leverages a cutting-edge technical stack to deliver instant, typo-tolerant search across millions of records.
+<p align="center">
+  <strong>Modern pharmaceutical data platform foundation</strong><br />
+  Built with Next.js, PostgreSQL, Prisma, Meilisearch, and a Playwright data scraper.
+</p>
 
-## 🚀 Core Technical Stack
+---
 
-- **Frontend**: [Next.js 14](https://nextjs.org/) (App Router), TypeScript, Tailwind CSS, shadcn/ui.
-- **Primary Database**: [PostgreSQL](https://www.postgresql.org/) (Relational Integrity).
-- **Search Engine**: [Meilisearch](https://www.meilisearch.com/) (High-performance Instant Search).
-- **ORM**: [Prisma](https://www.prisma.io/).
-- **Infrastructure**: [Docker Compose](https://www.docker.com/) for local development.
+## ✨ Project Overview
 
-## 🏛️ Architecture Overview
+**NovaPharm** is a pharmaceutical data platform project focused on structuring medicine information and preparing it for fast search and future product workflows.
 
-NovaPharm uses a dual-database architecture:
-1. **PostgreSQL** acts as the source of truth for relational medical data (medicines, ingredients, manufacturers).
-2. **Meilisearch** serves as the search engine, providing sub-50ms search latency with advanced filtering and typo tolerance.
+The repository currently includes:
+- a **web client** (`/client`) built with Next.js + TypeScript,
+- a **data model** using Prisma and PostgreSQL,
+- local infrastructure for **PostgreSQL** and **Meilisearch** via Docker Compose,
+- a **TypeScript scraper** (`/scraper`) using Playwright to collect medicine data from Infomed.
 
-Data synchronization is handled via Prisma Middleware/Extensions at the application level to ensure the search index is always up-to-date with the primary database.
+> **Current status:** The frontend is still close to the Next.js starter template, while backend structure and scraper foundations are already in place.
 
-## 🛠️ Getting Started
+---
 
-### Prerequisites
+## 🧱 Tech Stack
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Node.js](https://nodejs.org/) (v18+)
-- [npm](https://www.npmjs.com/)
+### Client / App Layer
+- **Next.js 14** (App Router)
+- **React 18**
+- **TypeScript**
+- **Tailwind CSS**
 
-### 1. Infrastructure Setup
+### Data & Search
+- **PostgreSQL 16** (primary relational database)
+- **Prisma ORM** (schema + client)
+- **Meilisearch** (search engine service in local stack)
 
-Start the PostgreSQL and Meilisearch containers:
+### Data Collection
+- **Playwright** + **TypeScript** scraper for Infomed source data
+
+### Local Development Infrastructure
+- **Docker Compose** for database and search services
+
+---
+
+## 🏛️ Architecture (Current)
+
+NovaPharm follows a dual-storage direction:
+1. **PostgreSQL** is intended as the source of truth for medicine entities.
+2. **Meilisearch** is intended for low-latency user search experiences.
+
+The Prisma schema currently defines key entities:
+- `Medicine`
+- `ActiveIngredient`
+- `Manufacturer`
+
+This gives a strong base for ingestion, normalization, and future indexing/search pipelines.
+
+---
+
+## 📂 Repository Structure
+
+```text
+NovaPharm/
+├── client/             # Next.js app + Prisma schema/config
+├── scraper/            # Playwright TypeScript scraper (Infomed)
+├── docker-compose.yml  # PostgreSQL + Meilisearch local services
+├── README.md
+└── LICENSE
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1) Start infrastructure
+
+From repository root:
 
 ```bash
 docker compose up -d
 ```
 
-### 2. Frontend & ORM Setup
+This starts:
+- PostgreSQL on `localhost:5432`
+- Meilisearch on `localhost:7700`
 
-Navigate to the client directory and install dependencies:
+### 2) Setup and run the client
 
 ```bash
 cd client
 npm install
-```
-
-Initialize the database schema:
-
-```bash
 npx prisma db push
-```
-
-### 3. Development Server
-
-Run the development server:
-
-```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open: http://localhost:3000
 
-## 📂 Project Structure
+### 3) Build and lint the client
 
-- `/client`: Next.js application, Prisma schema, and UI components.
-- `/docker-compose.yml`: Infrastructure configuration for PG and Meilisearch.
+```bash
+cd client
+npm run lint
+npm run build
+```
+
+---
+
+## 🕷️ Scraper Usage (Infomed)
+
+The scraper is located in `/scraper` and can either print its execution plan or run extraction.
+
+```bash
+cd scraper
+npm install
+npm run build
+```
+
+### Print implementation plan
+
+```bash
+npm run start
+```
+
+### Execute scraping
+
+```bash
+npm run scrape
+```
+
+Output file:
+- `scraper/infomed_data.json`
+
+---
+
+## 🔧 Environment Configuration
+
+### Client (`/client/.env`)
+
+```env
+DATABASE_URL="postgresql://devuser:devpassword@localhost:5432/novapharm?schema=public"
+```
+
+Default local credentials are also defined in `docker-compose.yml`:
+- `POSTGRES_USER=devuser`
+- `POSTGRES_PASSWORD=devpassword`
+- `POSTGRES_DB=novapharm`
+
+For production deployments, use secure credentials and secret management.
+
+---
+
+## 📌 Available NPM Scripts
+
+### `/client`
+- `npm run dev` — start development server
+- `npm run build` — production build
+- `npm run start` — run built app
+- `npm run lint` — run Next.js ESLint checks
+
+### `/scraper`
+- `npm run build` — compile TypeScript
+- `npm run start` — show execution plan
+- `npm run scrape` — run real scraping
+
+---
+
+## 🛣️ Recommended Next Milestones
+
+- Build domain-focused UI for medicine search and detail pages.
+- Implement ingestion pipeline from `infomed_data.json` to PostgreSQL.
+- Add automated synchronization/indexing into Meilisearch.
+- Introduce tests for scraper parsing and data validation.
+- Add CI checks for lint/build/smoke validation.
+
+---
 
 ## ⚖️ License
 
-Copyright (c) 2026 NovaPharm / kotelyanets. All rights reserved.
+Copyright (c) 2026 NovaPharm / kotelyanets.
 
-This software is **PROPRIETARY**. Unauthorized use, modification, or redistribution is strictly prohibited. You may view the source code for educational or review purposes only. See the [LICENSE](LICENSE) file for full details.
+This project is **proprietary**. You may view source code for educational or review purposes only. Modification, redistribution, and commercial use are prohibited without prior written consent.
+
+See [LICENSE](LICENSE) for full terms.
