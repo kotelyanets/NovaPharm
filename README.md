@@ -66,4 +66,6 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## ⚖️ License
 
-Project developed for enterprise medical search. All rights reserved.
+Copyright (c) 2026 NovaPharm / kotelyanets. All rights reserved.
+
+This software is **PROPRIETARY**. Unauthorized use, modification, or redistribution is strictly prohibited. You may view the source code for educational or review purposes only. See the [LICENSE](LICENSE) file for full details.
